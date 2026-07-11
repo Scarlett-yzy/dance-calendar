@@ -1,0 +1,109 @@
+@import "tailwindcss";
+
+:root {
+  --background: #faf8f6;
+  --foreground: #2d2a24;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-cream: #faf8f6;
+  --color-cream-dark: #f0ece6;
+  --color-warm-dark: #2d2a24;
+  --color-warm-muted: #8f8579;
+  --color-coral: #ff6b6b;
+  --color-coral-light: #ff8e8e;
+  --color-teal: #4ecdc4;
+  --color-teal-light: #7eddd6;
+  --color-sun: #ffd93d;
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Noto Sans SC", var(--font-geist-sans), sans-serif;
+}
+
+::-webkit-scrollbar {
+  height: 4px;
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #e0d8d0;
+  border-radius: 2px;
+}
+
+/* 首页动画 */
+@keyframes sway {
+  0% { transform: translateX(-12px) rotate(-1.2deg); }
+  50% { transform: translateX(3px) rotate(0.5deg); }
+  100% { transform: translateX(12px) rotate(1.2deg); }
+}
+@keyframes sparkle {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+@keyframes sparkle-delay {
+  0%, 100% { opacity: 0.2; transform: scale(0.6); }
+  50% { opacity: 0.9; transform: scale(1.1); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+
+/* 树叶摇摆 */
+@keyframes swing {
+  0% { transform: rotate(0deg); }
+  50% { transform: rotate(3deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* 花瓣飘落 */
+@keyframes fall {
+  0% { transform: translateY(-30px) rotate(0deg); opacity: 0.8; }
+  100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
+}
+
+/* pai.co 风格 - 各色块独立漂移 */
+@keyframes driftA {
+  0% { transform: translate(0%, 0%) scale(1); }
+  25% { transform: translate(12%, -10%) scale(1.08); }
+  50% { transform: translate(-8%, 12%) scale(0.92); }
+  75% { transform: translate(6%, -6%) scale(1.04); }
+  100% { transform: translate(0%, 0%) scale(1); }
+}
+@keyframes driftB {
+  0% { transform: translate(0%, 0%) scale(1); }
+  25% { transform: translate(-12%, 8%) scale(1.1); }
+  50% { transform: translate(10%, -12%) scale(0.9); }
+  75% { transform: translate(-6%, 6%) scale(1.05); }
+  100% { transform: translate(0%, 0%) scale(1); }
+}
+@keyframes driftC {
+  0% { transform: translate(0%, 0%) scale(1); }
+  33% { transform: translate(15%, 10%) scale(1.08); }
+  66% { transform: translate(-10%, -6%) scale(0.92); }
+  100% { transform: translate(0%, 0%) scale(1); }
+}
+@keyframes driftD {
+  0% { transform: translate(0%, 0%) scale(1); }
+  33% { transform: translate(-10%, -14%) scale(0.92); }
+  66% { transform: translate(12%, 8%) scale(1.1); }
+  100% { transform: translate(0%, 0%) scale(1); }
+}
+
+/* 渐变背景流动 */
+@keyframes flowBg {
+  0% { background-position: 0% 0%; }
+  25% { background-position: 50% 30%; }
+  50% { background-position: 80% 60%; }
+  75% { background-position: 30% 80%; }
+  100% { background-position: 0% 0%; }
+}
