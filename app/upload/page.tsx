@@ -209,7 +209,7 @@ export default function UploadPage() {
           thumbnailUrl: thumbResult.url,
           referenceFileUrl: refResult?.url || null,
           referencePublicId: refResult?.publicId || null,
-          referenceTitle: refResult ? refVideoTitle || refVideoFile.name.replace(/\.[^/.]+$/, "") : null,
+          referenceTitle: refResult && refVideoFile ? refVideoTitle || refVideoFile.name.replace(/\.[^/.]+$/, "") : null,
         }),
       });
 

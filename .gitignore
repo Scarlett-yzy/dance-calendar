@@ -55,5 +55,3 @@ prisma/dev.db
 # local uploads (for dev only; production uses Cloudinary)
 public/uploads/
 public/design.png
-
-.vercel
