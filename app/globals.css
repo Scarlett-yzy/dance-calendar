@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+/* Calendar grid auto-rows: 118px desktop / 78px mobile */
+.calendar-grid {
+  grid-auto-rows: 118px;
+}
+@media (max-width: 640px) {
+  .calendar-grid {
+    grid-auto-rows: 78px;
+    gap: 4px;
+  }
+}
+
 :root {
   --background: #faf8f6;
   --foreground: #2d2a24;
