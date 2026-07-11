@@ -17,7 +17,7 @@ interface VideoPlayerProps {
   sessionIdx: number;
   sessionId?: string;
   videoTitle?: string;
-  onScreenshot?: (blob: Blob, sessionIdx: number) => void;
+  onScreenshot?: (videoUrl: string, sessionIdx: number, currentTime: number) => void;
   onDelete?: (sessionId: string) => void;
 }
 
@@ -176,21 +176,7 @@ export default function VideoPlayer({ src, sessionIdx, sessionId, videoTitle, on
 
   const captureFrame = () => {
     if (!videoRef.current || !onScreenshot) return;
-
-    const video = videoRef.current;
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    ctx.drawImage(video, 0, 0);
-
-    canvas.toBlob((blob) => {
-      if (blob) onScreenshot(blob, sessionIdx);
-    }, "image/png");
-
+    onScreenshot(src, sessionIdx, videoRef.current.currentTime);
     setContextMenu(null);
   };
 
@@ -232,6 +218,7 @@ export default function VideoPlayer({ src, sessionIdx, sessionId, videoTitle, on
         onEnded={() => setPlaying(false)}
         onContextMenu={handleContextMenu}
         playsInline
+        crossOrigin="anonymous"
       />
 
       {/* 播放/暂停大按钮（暂停时显示） */}
@@ -311,15 +298,8 @@ export default function VideoPlayer({ src, sessionIdx, sessionId, videoTitle, on
             {/* 截图按钮 */}
             <button
               onClick={() => {
-                if (videoRef.current && onScreenshot) {
-                  const canvas = document.createElement("canvas");
-                  canvas.width = videoRef.current.videoWidth;
-                  canvas.height = videoRef.current.videoHeight;
-                  canvas.getContext("2d")?.drawImage(videoRef.current, 0, 0);
-                  canvas.toBlob((blob) => {
-                    if (blob) onScreenshot(blob, sessionIdx);
-                  }, "image/png");
-                }
+                if (!videoRef.current || !onScreenshot) return;
+                onScreenshot(src, sessionIdx, videoRef.current.currentTime);
               }}
               className="hover:text-zinc-300 transition-colors"
               title="截图当前帧"

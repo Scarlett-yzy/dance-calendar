@@ -8,6 +8,7 @@ export interface BlockContent {
 export interface BlockImage {
   id: string;
   url: string;
+  source?: "main" | "ref";
   annotations?: Annotation[];
 }
 

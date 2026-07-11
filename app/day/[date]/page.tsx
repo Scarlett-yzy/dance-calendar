@@ -94,34 +94,41 @@ export default function DayDetailPage() {
     }
   };
 
-  // 截图 → 添加到对应 session
-  const handleScreenshot = useCallback(async (blob: Blob, sessionIdx: number, source?: "main" | "ref") => {
-    const formData = new FormData();
-    formData.append("image", blob, "screenshot.png");
-
+  // 截图 → 直接用 Cloudinary 帧提取 URL（无需上传）
+  const handleScreenshot = useCallback(async (videoUrl: string, sessionIdx: number, currentTime: number) => {
     try {
-      const res = await fetch("/api/screenshots", {
+      const res = await fetch("/api/framescreenshot", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ videoUrl, currentTime }),
       });
       const data = await res.json();
+      if (!data.success) throw new Error(data.error);
 
-      if (data.success) {
-        const newImg = { id: crypto.randomUUID(), url: data.url };
+      const newImg = { id: crypto.randomUUID(), url: data.url };
 
-        setSessions((prev) => {
-          if (sessionIdx < 0 || sessionIdx >= prev.length) return prev;
-          const updated = [...prev];
-          const session = updated[sessionIdx];
+      setSessions((prev) => {
+        if (sessionIdx < 0 || sessionIdx >= prev.length) return prev;
+        const updated = structuredClone(prev);
+        const session = updated[sessionIdx];
 
-          // 找最后一个 mixed 或 text 格子里放，没有就新建
-          const targetBlock = session.blocks.findLast((b) => b.type === "mixed" || b.type === "text");
-          if (targetBlock) {
+        const isCompare = !!session.referenceFileUrl;
+
+        if (isCompare) {
+          const source = videoUrl === session.referenceFileUrl ? "ref" : "main";
+          const taggedImg = { ...newImg, source };
+
+          // 找已有的对比 block
+          const compareBlock = session.blocks.find((b: any) =>
+            (b.content?.images || []).some((i: any) => i.source)
+          );
+
+          if (compareBlock) {
             updated[sessionIdx] = {
               ...session,
-              blocks: session.blocks.map((b) =>
-                b.id === targetBlock.id
-                  ? { ...b, type: "mixed", content: { ...b.content, images: [...(b.content.images || []), newImg], text: b.content.text || "" } }
+              blocks: session.blocks.map((b: any) =>
+                b.id === compareBlock.id
+                  ? { ...b, content: { text: b.content.text || "", images: [...(b.content.images || []), taggedImg] } }
                   : b
               ),
             };
@@ -132,18 +139,32 @@ export default function DayDetailPage() {
                 ...session.blocks,
                 {
                   id: crypto.randomUUID(),
-                  type: "mixed",
+                  type: "mixed" as const,
                   sortOrder: session.blocks.length,
-                  content: { text: "", images: [newImg] },
+                  content: { text: "🎬 对比", images: [taggedImg] },
                 },
               ],
             };
           }
-          return updated;
-        });
-      }
+        } else {
+          // 无对比视频：每个截图单独一个框
+          updated[sessionIdx] = {
+            ...session,
+            blocks: [
+              ...session.blocks,
+              {
+                id: crypto.randomUUID(),
+                type: "mixed" as const,
+                sortOrder: session.blocks.length,
+                content: { text: "", images: [newImg] },
+              },
+            ],
+          };
+        }
+        return [...updated];
+      });
     } catch (error) {
-      console.error("截图保存失败:", error);
+      console.error("截图失败:", error);
     }
   }, []);
 

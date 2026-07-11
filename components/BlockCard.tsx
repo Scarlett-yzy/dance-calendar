@@ -6,6 +6,7 @@ import { ImagePlus, X, Loader2, PencilLine, Maximize2, GripVertical } from "luci
 interface BlockImage {
   id: string;
   url: string;
+  source?: "main" | "ref";
 }
 
 interface BlockCardProps {
@@ -90,71 +91,91 @@ export default function BlockCard({
   return (
     <>
       <div className="rounded-xl border backdrop-blur-sm overflow-hidden group" style={{ borderColor: "#d4c5bd", backgroundColor: "#faf8f5" }}>
-        {/* 图片列表 — 智能网格布局 + 可拖拽 */}
+        {/* 图片列表 — 对比模式 / 普通网格 */}
         {images.length > 0 && (
           <div className="p-2">
-            <div className={`
-              grid gap-1
-              ${images.length === 1 ? "grid-cols-1" : ""}
-              ${images.length === 2 ? "grid-cols-2" : ""}
-              ${images.length === 3 ? "grid-cols-2" : ""}
-              ${images.length >= 4 ? "grid-cols-2" : ""}
-            `}>
-              {images.map((img, idx) => {
-                const isFirst = idx === 0 && images.length === 3;
+            {(() => {
+              const hasSource = images.some((img) => img.source);
+              if (!hasSource) {
                 return (
-                  <div
-                    key={img.id}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, idx)}
-                    onDragOver={(e) => handleDragOver(e, idx)}
-                    onDrop={(e) => handleDrop(e, idx)}
-                    onDragEnd={handleDragEnd}
-                    className={`
-                      relative rounded-lg overflow-hidden group/img
-                      ${isFirst ? "col-span-2" : ""}
-                      ${dragOverIdx === idx ? "ring-2 ring-zinc-400" : ""}
-                      cursor-grab active:cursor-grabbing
-                    `}
-                  >
-                    <img
-                      src={img.url}
-                      alt="笔记图片"
-                      className={`w-full object-contain ${isFirst ? "max-h-60" : "max-h-36"} hover:opacity-90 transition-opacity`}
-                      onClick={() => setPreviewUrl(img.url)}
-                    />
-
-                    {/* 拖拽把手 */}
-                    <div className="absolute top-1 left-1 opacity-0 group-hover/img:opacity-100 transition-opacity">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-md bg-black/40 text-white cursor-grab active:cursor-grabbing">
-                        <GripVertical className="h-3.5 w-3.5" />
-                      </span>
-                    </div>
-
-                    {/* 操作按钮 */}
-                    <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover/img:opacity-100 transition-opacity">
-                      {onEditImage && (
-                        <button onClick={(e) => { e.stopPropagation(); onEditImage(img.id, img.url); }}
-                          className="flex h-6 w-6 items-center justify-center rounded-md bg-white/80 backdrop-blur text-zinc-600 hover:bg-white"
-                          title="编辑标注">
-                          <PencilLine className="h-3 w-3" />
-                        </button>
-                      )}
-                      <button onClick={(e) => { e.stopPropagation(); onRemoveImage(img.id); }}
-                        className="flex h-6 w-6 items-center justify-center rounded-md bg-white/80 backdrop-blur text-red-500 hover:bg-white"
-                        title="删除图片">
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
+                  <div className={`grid gap-1 ${
+                    images.length === 1 ? "grid-cols-1" : "grid-cols-2"
+                  }`}>
+                    {images.map((img, idx) => (
+                      <div key={img.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, idx)}
+                        onDragOver={(e) => handleDragOver(e, idx)}
+                        onDrop={(e) => handleDrop(e, idx)}
+                        onDragEnd={handleDragEnd}
+                        className={`relative rounded-lg overflow-hidden group/img cursor-grab active:cursor-grabbing ${dragOverIdx === idx ? "ring-2 ring-zinc-400" : ""}`}
+                      >
+                        <img src={img.url} alt="笔记图片"
+                          className="w-full object-contain max-h-36 hover:opacity-90 transition-opacity"
+                          onClick={() => setPreviewUrl(img.url)}
+                        />
+                        <div className="absolute top-1 left-1 opacity-0 group-hover/img:opacity-100 transition-opacity">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-black/40 text-white cursor-grab"><GripVertical className="h-3.5 w-3.5" /></span>
+                        </div>
+                        <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover/img:opacity-100 transition-opacity">
+                          {onEditImage && (<button onClick={(e) => { e.stopPropagation(); onEditImage(img.id, img.url); }}
+                            className="flex h-6 w-6 items-center justify-center rounded-md bg-white/80 backdrop-blur text-zinc-600 hover:bg-white" title="编辑标注"><PencilLine className="h-3 w-3" /></button>)}
+                          <button onClick={(e) => { e.stopPropagation(); onRemoveImage(img.id); }}
+                            className="flex h-6 w-6 items-center justify-center rounded-md bg-white/80 backdrop-blur text-red-500 hover:bg-white" title="删除图片"><X className="h-3 w-3" /></button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 );
-              })}
-            </div>
+              }
 
-            {/* 提示 */}
-            <p className="text-[10px] text-zinc-300 mt-1 text-center">
-              拖拽图片可重新排列 · 点击放大
-            </p>
+              const refImgs = images.filter((i) => i.source === "ref");
+              const mainImgs = images.filter((i) => i.source === "main");
+              const maxPairs = Math.max(refImgs.length, mainImgs.length);
+
+              return (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-1 text-[10px] text-center font-medium" style={{ color: "#8c887e" }}>
+                    <div className="py-1 rounded" style={{ background: "#f0ece6" }}>📖 参考视频</div>
+                    <div className="py-1 rounded" style={{ background: "#f0ece6" }}>🩰 练习视频</div>
+                  </div>
+                  {Array.from({ length: maxPairs }).map((_, pairIdx) => (
+                    <div key={pairIdx} className="grid grid-cols-2 gap-1">
+                      {[refImgs[pairIdx], mainImgs[pairIdx]].map((img, colIdx) => (
+                        <div key={colIdx} className="relative rounded-lg overflow-hidden group/img"
+                          style={img ? {} : { background: "#f5f2ec", minHeight: 80 }}
+                        >
+                          {img ? (
+                            <>
+                              <img src={img.url} alt={colIdx === 0 ? "参考截图" : "练习截图"}
+                                className="w-full object-contain max-h-36 hover:opacity-90 transition-opacity cursor-pointer"
+                                onClick={() => setPreviewUrl(img.url)}
+                              />
+                              <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover/img:opacity-100 transition-opacity">
+                                {onEditImage && (
+                                  <button onClick={(e) => { e.stopPropagation(); onEditImage(img.id, img.url); }}
+                                    className="flex h-6 w-6 items-center justify-center rounded-md bg-white/80 backdrop-blur text-zinc-600 hover:bg-white" title="编辑标注"><PencilLine className="h-3 w-3" /></button>
+                                )}
+                                <button onClick={(e) => { e.stopPropagation(); onRemoveImage(img.id); }}
+                                  className="flex h-6 w-6 items-center justify-center rounded-md bg-white/80 backdrop-blur text-red-500 hover:bg-white" title="删除"><X className="h-3 w-3" /></button>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="flex items-center justify-center h-full text-xs" style={{ color: "#c5bdb5" }}>—</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
+            {!images.some((i) => i.source) && (
+              <p className="text-[10px] text-zinc-300 mt-1 text-center">
+                拖拽图片可重新排列 · 点击放大
+              </p>
+            )}
           </div>
         )}
 

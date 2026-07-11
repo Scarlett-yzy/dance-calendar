@@ -10,7 +10,7 @@ interface ComparePlayerProps {
   refSrc: string;
   refTitle: string;
   sessionId: string;
-  onScreenshot?: (blob: Blob, sessionIdx: number, source: "main" | "ref") => void;
+  onScreenshot?: (videoUrl: string, sessionIdx: number, currentTime: number) => void;
   onDelete?: (sessionId: string) => void;
   onDeleteRef?: (sessionId: string) => void;
   sessionIdx: number;
@@ -114,12 +114,9 @@ export default function ComparePlayer({
 
   const capture = (which: "main" | "ref") => {
     const video = which === "main" ? mainVideoRef.current : refVideoRef.current;
+    const videoSrc = which === "main" ? mainSrc : refSrc;
     if (!video || !onScreenshot) return;
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
-    canvas.getContext("2d")?.drawImage(video, 0, 0);
-    canvas.toBlob((blob) => { if (blob) onScreenshot(blob, sessionIdx, which); }, "image/png");
+    onScreenshot(videoSrc, sessionIdx, video.currentTime);
   };
 
   const handleContextMenu = (e: React.MouseEvent, target: "main" | "ref") => {
@@ -179,6 +176,7 @@ export default function ComparePlayer({
             onEnded={() => setPlaying(false)}
             onContextMenu={(e) => handleContextMenu(e, which)}
             onDoubleClick={() => { if (containerRef.current) { if (!document.fullscreenElement) containerRef.current.requestFullscreen(); else document.exitFullscreen(); } }}
+            crossOrigin="anonymous"
             playsInline />
 
           {!playing && (
