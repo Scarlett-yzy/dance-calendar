@@ -5,6 +5,16 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Upload, Loader2 } from "lucide-react";
 
+const CLOUDINARY_UPLOAD_URL = "https://api.cloudinary.com/v1_1";
+
+interface CloudinaryAuth {
+  cloudName: string;
+  apiKey: string;
+  timestamp: number;
+  signature: string;
+  folder: string;
+}
+
 export default function UploadPage() {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -24,6 +34,9 @@ export default function UploadPage() {
   const [refVideoTitle, setRefVideoTitle] = useState("");
   const refInputRef = useRef<HTMLInputElement>(null);
 
+  const [progress, setProgress] = useState(0);
+  const [progressText, setProgressText] = useState("");
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const dateParam = params.get("date");
@@ -41,6 +54,57 @@ export default function UploadPage() {
   }, []);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+
+  /** 获取 Cloudinary 签名 */
+  const getAuth = async (): Promise<CloudinaryAuth> => {
+    const res = await fetch("/api/cloudinary-auth");
+    if (!res.ok) throw new Error("无法获取上传凭证");
+    return res.json();
+  };
+
+  /** 上传文件到 Cloudinary（浏览器直传） */
+  const uploadToCloudinary = async (
+    file: File,
+    auth: CloudinaryAuth,
+    resourceType: "video" | "image",
+    onProgress?: (pct: number) => void
+  ) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("api_key", auth.apiKey);
+    formData.append("timestamp", String(auth.timestamp));
+    formData.append("signature", auth.signature);
+    formData.append("folder", auth.folder);
+
+    return new Promise<{ url: string; publicId: string }>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const url = `${CLOUDINARY_UPLOAD_URL}/${auth.cloudName}/${resourceType}/upload`;
+
+      xhr.open("POST", url);
+      xhr.responseType = "json";
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && onProgress) {
+          onProgress(Math.round((e.loaded / e.total) * 100));
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status === 200 && xhr.response) {
+          resolve({
+            url: xhr.response.secure_url,
+            publicId: xhr.response.public_id,
+          });
+        } else {
+          const msg = xhr.response?.error?.message || "上传到云存储失败";
+          reject(new Error(msg));
+        }
+      };
+
+      xhr.onerror = () => reject(new Error("网络错误，上传失败"));
+      xhr.send(formData);
+    });
+  };
 
   const handleFileSelect = (file: File) => {
     if (!file.type.startsWith("video/")) {
@@ -102,40 +166,65 @@ export default function UploadPage() {
     }
 
     setUploading(true);
+    setProgress(0);
 
     try {
-      const formData = new FormData();
-      formData.append("video", videoFile);
-      formData.append("title", title);
-      formData.append("recordDate", recordDate);
+      // 1. 获取 Cloudinary 上传凭证
+      setProgressText("获取上传凭证…");
+      const auth = await getAuth();
 
-      if (enableCompare && refVideoFile) {
-        formData.append("referenceVideo", refVideoFile);
-        formData.append("referenceTitle", refVideoTitle || refVideoFile.name.replace(/\.[^/.]+$/, ""));
-      }
-
-      const thumbnailFile = new File(
-        [thumbnailBlob],
-        "thumbnail.jpg",
-        { type: "image/jpeg" }
-      );
-      formData.append("thumbnail", thumbnailFile);
-
-      const res = await fetch("/api/videos", {
-        method: "POST",
-        body: formData,
+      // 2. 上传视频到 Cloudinary（浏览器直传）
+      setProgressText("上传视频中…");
+      const videoResult = await uploadToCloudinary(videoFile, auth, "video", (pct) => {
+        setProgress(Math.round(pct * 0.7)); // 视频占70%进度
       });
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "上传失败");
+      // 3. 上传缩略图
+      setProgressText("上传封面…");
+      const thumbnailFile = new File([thumbnailBlob], "thumbnail.jpg", { type: "image/jpeg" });
+      const thumbResult = await uploadToCloudinary(thumbnailFile, auth, "image", (pct) => {
+        setProgress(70 + Math.round(pct * 0.1)); // 缩略图占10%
+      });
+
+      // 4. 上传参考视频（如果有）
+      let refResult: { url: string; publicId: string } | null = null;
+      if (enableCompare && refVideoFile) {
+        setProgressText("上传参考视频…");
+        refResult = await uploadToCloudinary(refVideoFile, auth, "video", (pct) => {
+          setProgress(80 + Math.round(pct * 0.1));
+        });
       }
 
+      // 5. 保存到数据库
+      setProgressText("保存记录…");
+      setProgress(95);
+      const saveRes = await fetch("/api/videos/direct", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          recordDate,
+          videoUrl: videoResult.url,
+          videoPublicId: videoResult.publicId,
+          thumbnailUrl: thumbResult.url,
+          referenceFileUrl: refResult?.url || null,
+          referencePublicId: refResult?.publicId || null,
+          referenceTitle: refResult ? refVideoTitle || refVideoFile.name.replace(/\.[^/.]+$/, "") : null,
+        }),
+      });
+
+      if (!saveRes.ok) {
+        const err = await saveRes.json();
+        throw new Error(err.error || "保存记录失败");
+      }
+
+      setProgress(100);
       router.push(recordDate ? `/day/${recordDate}` : "/calendar");
     } catch (error) {
       alert(error instanceof Error ? error.message : "上传失败");
     } finally {
       setUploading(false);
+      setProgressText("");
     }
   };
 
@@ -158,7 +247,7 @@ export default function UploadPage() {
         <h1 className="text-sm font-medium" style={{ color: "#6b5d59" }}>上传舞蹈视频</h1>
       </div>
 
-      {/* 主内容 - 垂直居中 */}
+      {/* 主内容 */}
       <div className="flex-1 flex items-center justify-center px-6 pb-20 relative z-10">
         <div className="w-full max-w-lg">
           {!videoFile ? (
@@ -205,6 +294,25 @@ export default function UploadPage() {
                   <p className="text-xs text-center py-1.5" style={{ color: "#8a7b76" }}>
                     ↑ 自动截取的第一帧作为封面
                   </p>
+                </div>
+              )}
+
+              {/* 进度条 */}
+              {uploading && (
+                <div className="rounded-xl bg-white/40 p-4 space-y-2">
+                  <div className="flex justify-between text-xs" style={{ color: "#6b5d59" }}>
+                    <span>{progressText}</span>
+                    <span>{progress}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-white/40 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-300"
+                      style={{
+                        width: `${progress}%`,
+                        background: "linear-gradient(90deg, #8f8fae, #6f6f92)",
+                      }}
+                    />
+                  </div>
                 </div>
               )}
 
@@ -261,10 +369,12 @@ export default function UploadPage() {
                 <button onClick={handleUpload} disabled={uploading || !thumbnailBlob}
                   className="flex-1 rounded-xl px-4 py-3 text-sm font-medium text-white flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                   style={{
-                    background: "linear-gradient(120deg, #8f8fae, #6f6f92)",
+                    background: uploading
+                      ? "linear-gradient(120deg, #b8b8cc, #8f8fae)"
+                      : "linear-gradient(120deg, #8f8fae, #6f6f92)",
                     boxShadow: "0 8px 20px rgba(111,111,146,0.3)",
                   }}>
-                  {uploading ? <><Loader2 className="h-4 w-4 animate-spin" /> 上传中...</> : <><Upload className="h-4 w-4" /> 上传视频</>}
+                  {uploading ? <><Loader2 className="h-4 w-4 animate-spin" /> {progressText}</> : <><Upload className="h-4 w-4" /> 上传视频</>}
                 </button>
               </div>
             </div>
